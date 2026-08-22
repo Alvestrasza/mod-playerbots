@@ -69,12 +69,9 @@ bool SmartDestroyItemAction::Execute(Event /*event*/)
 
     std::vector<uint32> bestToDestroy = {ITEM_USAGE_NONE};  // First destroy anything useless.
 
-    if (!AI_VALUE(bool, "can sell") &&
-        AI_VALUE(
-            bool,
-            "should get money"))  // We need money so quest items are less important since they can't directly be sold.
-        bestToDestroy.push_back(ITEM_USAGE_QUEST);
-    else  // We don't need money so destroy the cheapest stuff.
+    // ITEM_USAGE_QUEST means the item is still required by an active quest. Destroying it can make the quest
+    // impossible to complete (in particular for source items with charges), so it must never be a bag-space victim.
+    if (AI_VALUE(bool, "can sell") || !AI_VALUE(bool, "should get money"))
     {
         bestToDestroy.push_back(ITEM_USAGE_VENDOR);
         bestToDestroy.push_back(ITEM_USAGE_AH);

@@ -487,9 +487,9 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
             if (Item* sourceItem = bot->GetItemByEntry(sourceItemId))
                 candidates.push_back(sourceItem);
         }
-        for (Item* questItem : questItems)
+        else
         {
-            if (std::find(candidates.begin(), candidates.end(), questItem) == candidates.end())
+            for (Item* questItem : questItems)
                 candidates.push_back(questItem);
         }
         if (candidates.empty())
