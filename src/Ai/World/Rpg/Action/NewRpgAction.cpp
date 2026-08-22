@@ -6,6 +6,7 @@
 
 #include "NewRpgAction.h"
 #include "AreaDefines.h"
+#include "AiObjectContext.h"
 #include "BroadcastHelper.h"
 #include "ChatHelper.h"
 #include "GossipDef.h"
@@ -26,6 +27,7 @@
 #include "SharedDefines.h"
 #include "Timer.h"
 #include "TravelMgr.h"
+#include "UseItemAction.h"
 #include "G3D/Vector2.h"
 #include <cmath>
 #include <cstdlib>
@@ -515,6 +517,9 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
     // Now we are near the quest objective
     // kill mobs and looting quest should be done automatically by grind strategy
 
+    if (UseQuestObjectiveItem(data))
+        return true;
+
     if (!data.lastReachPOI)
     {
         data.lastReachPOI = getMSTime();
@@ -562,6 +567,122 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
     // ~8yd wander reads as the bot looking around while grind/loot
     // strategies do their work.
     return MoveRandomNear(8.0f);
+}
+
+bool NewRpgDoQuestAction::UseQuestObjectiveItem(NewRpgInfo::DoQuest& data)
+{
+    int32 objectiveIdx = data.objectiveIdx;
+    if (objectiveIdx < 0 || objectiveIdx >= QUEST_OBJECTIVES_COUNT)
+        return false;
+
+    Quest const* quest = sObjectMgr->GetQuestTemplate(data.questId);
+    if (!quest)
+        return false;
+
+    uint32 itemId = quest->GetSrcItemId();
+    int32 requiredEntry = quest->RequiredNpcOrGo[objectiveIdx];
+    if (!itemId || !requiredEntry)
+        return false;
+
+    Item* item = bot->GetItemByEntry(itemId);
+    if (!item)
+        return false;
+
+    uint32 spellId = 0;
+    for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+    {
+        if (item->GetTemplate()->Spells[i].SpellId > 0)
+        {
+            spellId = item->GetTemplate()->Spells[i].SpellId;
+            break;
+        }
+    }
+    if (!spellId)
+        return false;
+
+    constexpr float useRange = 8.0f;
+    UseItemAction useItem(botAI, "use quest objective item", true);
+
+    if (requiredEntry > 0)
+    {
+        Unit* target = nullptr;
+        GuidVector candidates =
+            botAI->GetAiObjectContext()->GetValue<GuidVector>("possible new rpg targets")->Get();
+        for (ObjectGuid const& guid : candidates)
+        {
+            Unit* candidate = botAI->GetUnit(guid);
+            if (!candidate || !candidate->IsInWorld() || candidate->GetEntry() != static_cast<uint32>(requiredEntry))
+                continue;
+
+            if (!botAI->CanCastSpell(spellId, candidate, false, nullptr, item))
+                continue;
+
+            if (!target || bot->GetDistance(candidate) < bot->GetDistance(target))
+                target = candidate;
+        }
+
+        if (!target)
+            return false;
+
+        if (bot->GetDistance(target) > useRange)
+            return MoveWorldObjectTo(target->GetGUID(), useRange);
+
+        if (bot->isMoving())
+        {
+            bot->StopMoving();
+            return true;
+        }
+
+        bot->SetFacingToObject(target);
+        bool used = useItem.UseItemOnUnit(item, target);
+        if (used)
+        {
+            botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+            LOG_DEBUG("playerbots", "[New RPG] {} used quest item {} on creature {} for quest {}", bot->GetName(),
+                      itemId, requiredEntry, data.questId);
+        }
+        return used;
+    }
+
+    GameObject* target = nullptr;
+    uint32 gameObjectEntry = static_cast<uint32>(-requiredEntry);
+    GuidVector candidates =
+        botAI->GetAiObjectContext()->GetValue<GuidVector>("possible new rpg game objects")->Get();
+    for (ObjectGuid const& guid : candidates)
+    {
+        GameObject* candidate = botAI->GetGameObject(guid);
+        if (!candidate || !candidate->IsInWorld() || !candidate->isSpawned() ||
+            candidate->GetEntry() != gameObjectEntry)
+            continue;
+
+        if (!target || bot->GetDistance(candidate) < bot->GetDistance(target))
+            target = candidate;
+    }
+
+    if (!target)
+        return false;
+
+    if (bot->GetDistance(target) > useRange)
+        return MoveWorldObjectTo(target->GetGUID(), useRange);
+
+    if (bot->isMoving())
+    {
+        bot->StopMoving();
+        return true;
+    }
+
+    if (!botAI->CanCastSpell(spellId, target, false))
+        return false;
+
+    bot->SetFacingToObject(target);
+    bool used = useItem.UseItemOnGameObject(item, target->GetGUID());
+    if (used)
+    {
+        botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+        LOG_DEBUG("playerbots", "[New RPG] {} used quest item {} on game object {} for quest {}", bot->GetName(),
+                  itemId, gameObjectEntry, data.questId);
+    }
+    return used;
 }
 
 bool NewRpgDoQuestAction::DoCompletedQuest(NewRpgInfo::DoQuest& data)

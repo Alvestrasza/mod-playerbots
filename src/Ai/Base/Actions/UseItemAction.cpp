@@ -61,6 +61,8 @@ bool UseItemAction::UseItemAuto(Item* item) { return UseItem(item, ObjectGuid::E
 
 bool UseItemAction::UseItemOnGameObject(Item* item, ObjectGuid go) { return UseItem(item, go, nullptr); }
 
+bool UseItemAction::UseItemOnUnit(Item* item, Unit* unit) { return UseItem(item, ObjectGuid::Empty, nullptr, unit); }
+
 bool UseItemAction::UseItemOnItem(Item* item, Item* itemTarget) { return UseItem(item, ObjectGuid::Empty, itemTarget); }
 
 bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Unit* unitTarget)
@@ -84,7 +86,18 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
         if (item->GetTemplate()->Spells[i].SpellId > 0)
         {
             spellId = item->GetTemplate()->Spells[i].SpellId;
-            if (!botAI->CanCastSpell(spellId, bot, false, itemTarget, item))
+            bool canCast = false;
+            if (goGuid)
+            {
+                GameObject* go = botAI->GetGameObject(goGuid);
+                canCast = go && go->isSpawned() && botAI->CanCastSpell(spellId, go, false);
+            }
+            else
+            {
+                canCast = botAI->CanCastSpell(spellId, unitTarget ? unitTarget : bot, false, itemTarget, item);
+            }
+
+            if (!canCast)
             {
                 return false;
             }
@@ -160,7 +173,7 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
         }
     }
 
-    if (!targetSelected && item->GetTemplate()->Class != ITEM_CLASS_CONSUMABLE && unitTarget)
+    if (!targetSelected && unitTarget)
     {
         targetFlag = TARGET_FLAG_UNIT;
         packet << targetFlag << unitTarget->GetGUID().WriteAsPacked();
