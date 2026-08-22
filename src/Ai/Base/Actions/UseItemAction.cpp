@@ -469,7 +469,9 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
 {
     std::vector<Item*> questItems = AI_VALUE2(std::vector<Item*>, "inventory items", "quest");
 
-    GuidVector unitCandidates = AI_VALUE(GuidVector, "possible new rpg targets");
+    // Quest objectives can target neutral creatures that are intentionally excluded from RPG targets.
+    // Use the complete nearby NPC set and filter it by the quest's required entry below.
+    GuidVector unitCandidates = AI_VALUE(GuidVector, "nearest npcs");
     GuidVector gameObjectCandidates = AI_VALUE(GuidVector, "nearest game objects no los");
 
     for (auto const& [questId, status] : bot->getQuestStatusMap())
