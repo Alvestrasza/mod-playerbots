@@ -90,7 +90,7 @@ bool UseItemAction::UseItem(Item* item, ObjectGuid goGuid, Item* itemTarget, Uni
             if (goGuid)
             {
                 GameObject* go = botAI->GetGameObject(goGuid);
-                canCast = go && go->isSpawned() && botAI->CanCastSpell(spellId, go, false);
+                canCast = go && go->isSpawned() && botAI->CanCastSpell(spellId, go, false, item);
             }
             else
             {
@@ -573,7 +573,7 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                     for (uint8 spellIndex = 0; spellIndex < MAX_ITEM_PROTO_SPELLS; ++spellIndex)
                     {
                         uint32 candidateSpellId = item->GetTemplate()->Spells[spellIndex].SpellId;
-                        if (candidateSpellId > 0 && botAI->CanCastSpell(candidateSpellId, nearest, false))
+                        if (candidateSpellId > 0 && botAI->CanCastSpell(candidateSpellId, nearest, false, item))
                         {
                             spellId = candidateSpellId;
                             break;

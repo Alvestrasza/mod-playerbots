@@ -3433,7 +3433,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, Unit* target, bool checkHasSpell,
     }
 }
 
-bool PlayerbotAI::CanCastSpell(uint32 spellid, GameObject* goTarget, bool checkHasSpell)
+bool PlayerbotAI::CanCastSpell(uint32 spellid, GameObject* goTarget, bool checkHasSpell, Item* castItem)
 {
     if (!spellid)
         return false;
@@ -3467,6 +3467,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, GameObject* goTarget, bool checkH
     Spell* spell = new Spell(bot, spellInfo, TRIGGERED_NONE);
 
     spell->m_targets.SetGOTarget(goTarget);
+    spell->m_CastItem = castItem;
     Item* item = aiObjectContext->GetValue<Item*>("item for spell", spellid)->Get();
     spell->m_targets.SetItemTarget(item);
 
