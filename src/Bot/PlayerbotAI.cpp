@@ -5277,6 +5277,14 @@ std::string const PlayerbotAI::HandleRemoteCommand(std::string const command)
     {
         return currentEngine->GetLastAction();
     }
+    else if (command == "activity")
+    {
+        return AllowActivity(ALL_ACTIVITY, true) ? "active" : "inactive";
+    }
+    else if (command == "questitem")
+    {
+        return DoSpecificAction("use random quest item", Event(), true) ? "ok" : "failed";
+    }
     else if (command == "values")
     {
         return GetAiObjectContext()->FormatValues();

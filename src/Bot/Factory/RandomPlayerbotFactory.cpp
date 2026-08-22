@@ -112,6 +112,12 @@ Player* RandomPlayerbotFactory::CreateRandomBot(WorldSession* session, uint8 cls
         return nullptr;
     }
 
+    return CreateBot(session, name, race, cls, gender);
+}
+
+Player* RandomPlayerbotFactory::CreateBot(WorldSession* session, std::string const& name, uint8 race, uint8 cls,
+                                           uint8 gender)
+{
     std::vector<uint8> skinColors, facialHairTypes;
     std::vector<std::pair<uint8, uint8>> faces, hairs;
     for (CharSectionsEntry const* charSection : sCharSectionsStore)
@@ -171,6 +177,76 @@ Player* RandomPlayerbotFactory::CreateRandomBot(WorldSession* session, uint8 cls
             name.c_str(), race, cls);
 
     return player;
+}
+
+bool RandomPlayerbotFactory::CreateObservationBot(uint32 accountId, std::string const& name, uint8 race, uint8 cls,
+                                                   uint8 gender, std::string& error)
+{
+    if (!accountId)
+    {
+        error = "account does not exist";
+        return false;
+    }
+
+    if (AccountMgr::GetCharactersCount(accountId) >= 10)
+    {
+        error = "account already has 10 characters";
+        return false;
+    }
+
+    if (cls == CLASS_DEATH_KNIGHT)
+    {
+        error = "death knights cannot be used for a level-1 observation bot";
+        return false;
+    }
+
+    if (gender >= GENDER_NONE)
+    {
+        error = "gender must be 0 (male) or 1 (female)";
+        return false;
+    }
+
+    if (!IsValidRaceClassCombination(race, cls, sWorld->getIntConfig(CONFIG_EXPANSION)))
+    {
+        error = "invalid race/class combination";
+        return false;
+    }
+
+    if (sObjectMgr->CheckPlayerName(name) != CHAR_NAME_SUCCESS)
+    {
+        error = "invalid or reserved character name";
+        return false;
+    }
+
+    CharacterDatabasePreparedStatement* nameStatement = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHECK_NAME);
+    nameStatement->SetData(0, name);
+    if (CharacterDatabase.Query(nameStatement))
+    {
+        error = "character name already exists";
+        return false;
+    }
+
+    std::unique_ptr<WorldSession> session = std::make_unique<WorldSession>(
+        accountId, "", 0x0, nullptr, SEC_PLAYER, EXPANSION_WRATH_OF_THE_LICH_KING, time_t(0), LOCALE_enUS, 0,
+        false, false, 0, true);
+
+    RandomPlayerbotFactory factory;
+    Player* player = factory.CreateBot(session.get(), name, race, cls, gender);
+    if (!player)
+    {
+        error = "core character creation failed";
+        return false;
+    }
+
+    player->SaveToDB(true, false);
+    sCharacterCache->AddCharacterCacheEntry(player->GetGUID(), accountId, player->GetName(), player->getGender(),
+                                             player->getRace(), player->getClass(), player->GetLevel());
+    player->CleanupsBeforeDelete();
+    delete player;
+
+    LOG_INFO("playerbots", "Observation bot created - account: {}, name: \"{}\", race: {}, class: {}, gender: {}",
+             accountId, name, race, cls, gender);
+    return true;
 }
 
 std::string const RandomPlayerbotFactory::CreateRandomBotName(NameRaceAndGender raceAndGender)

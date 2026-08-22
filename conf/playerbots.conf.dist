@@ -1720,6 +1720,12 @@ AiPlayerbot.RandomBotPrintStatsInterval = 300
 AiPlayerbot.MinRandomBotReviveTime = 60
 AiPlayerbot.MaxRandomBotReviveTime = 300
 
+# Enables automatic random-bot teleports, including periodic refresh, revive,
+# randomization and strategy-change teleports. This does not affect normal travel,
+# hearthstones, portals, flight paths or administrator teleport commands.
+# Default: 1
+AiPlayerbot.RandomBotTeleportEnabled = 1
+
 # Minimum and maximum seconds between bot teleports to new areas or zones
 # Defaults: 3600 (min), 18000 (max)
 AiPlayerbot.MinRandomBotTeleportInterval = 3600

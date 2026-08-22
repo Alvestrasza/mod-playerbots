@@ -164,6 +164,7 @@ public:
     uint32 minRandomBotRandomizeTime, maxRandomBotRandomizeTime;
     uint32 minRandomBotChangeStrategyTime, maxRandomBotChangeStrategyTime;
     uint32 minRandomBotReviveTime, maxRandomBotReviveTime;
+    bool randomBotTeleportEnabled;
     uint32 minRandomBotTeleportInterval, maxRandomBotTeleportInterval;
     uint32 permanentlyInWorldTime;
     uint32 minRandomBotPvpTime, maxRandomBotPvpTime;

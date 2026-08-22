@@ -1574,6 +1574,9 @@ void RandomPlayerbotMgr::Revive(Player* player)
 
 void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth)
 {
+    if (!sPlayerbotAIConfig.randomBotTeleportEnabled)
+        return;
+
     // ignore when alrdy teleported or not in the world yet.
     if (bot->IsBeingTeleported() || !bot->IsInWorld())
         return;
@@ -1798,6 +1801,9 @@ void RandomPlayerbotMgr::RandomTeleportGrindForLevel(Player* bot)
 
 void RandomPlayerbotMgr::RandomTeleport(Player* bot)
 {
+    if (!sPlayerbotAIConfig.randomBotTeleportEnabled)
+        return;
+
     if (bot->InBattleground())
         return;
 

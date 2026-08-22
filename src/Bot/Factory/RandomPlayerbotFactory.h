@@ -50,6 +50,8 @@ public:
     virtual ~RandomPlayerbotFactory() {}
 
     Player* CreateRandomBot(WorldSession* session, uint8 cls, std::unordered_map<NameRaceAndGender, std::vector<std::string>>& names);
+    static bool CreateObservationBot(uint32 accountId, std::string const& name, uint8 race, uint8 cls, uint8 gender,
+                                     std::string& error);
     static void CreateRandomBots();
     static void CreateRandomArenaTeams(ArenaType slot, uint32 count);
     static std::string const CreateRandomGuildName();
@@ -58,6 +60,7 @@ public:
 
 private:
     static bool IsValidRaceClassCombination(uint8 race, uint8 class_, uint32 expansion);
+    Player* CreateBot(WorldSession* session, std::string const& name, uint8 race, uint8 cls, uint8 gender);
     std::string const CreateRandomBotName(NameRaceAndGender raceAndGender);
     static std::string const CreateRandomArenaTeamName();
 };

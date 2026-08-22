@@ -5,12 +5,16 @@
  */
 
 #include "BattleGroundTactics.h"
+#include "AccountMgr.h"
 #include "Chat.h"
 #include "GuildTaskMgr.h"
 #include "PerfMonitor.h"
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
+#include "RandomPlayerbotFactory.h"
 #include "ScriptMgr.h"
+
+#include <sstream>
 
 using namespace Acore::ChatCommands;
 
@@ -36,6 +40,7 @@ public:
             {"bot", HandlePlayerbotCommand, SEC_PLAYER, Console::No},
             {"gtask", HandleGuildTaskCommand, SEC_GAMEMASTER, Console::Yes},
             {"pmon", HandlePerfMonCommand, SEC_GAMEMASTER, Console::Yes},
+            {"provision", HandleProvisionObservationBotCommand, SEC_ADMINISTRATOR, Console::Yes},
             {"rndbot", HandleRandomPlayerbotCommand, SEC_GAMEMASTER, Console::Yes},
             {"debug", playerbotsDebugCommandTable},
             {"account", playerbotsAccountCommandTable},
@@ -56,6 +61,48 @@ public:
     static bool HandleRandomPlayerbotCommand(ChatHandler* handler, char const* args)
     {
         return RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(handler, args);
+    }
+
+    static bool HandleProvisionObservationBotCommand(ChatHandler* handler, char const* args)
+    {
+        std::istringstream input(args ? args : "");
+        std::string accountName;
+        std::string characterName;
+        uint32 race = 0;
+        uint32 cls = 0;
+        uint32 gender = GENDER_NONE;
+
+        if (!(input >> accountName >> characterName >> race >> cls >> gender))
+        {
+            handler->PSendSysMessage(
+                "Usage: playerbots provision <rndbot-account> <character-name> <race> <class> <gender>");
+            return false;
+        }
+
+        if (accountName.rfind(sPlayerbotAIConfig.randomBotAccountPrefix, 0) != 0)
+        {
+            handler->PSendSysMessage("Account must use the configured random-bot prefix: %s",
+                                     sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
+            return false;
+        }
+
+        if (race > UINT8_MAX || cls > UINT8_MAX || gender > GENDER_FEMALE)
+        {
+            handler->PSendSysMessage("Race, class or gender is outside the supported range");
+            return false;
+        }
+
+        uint32 accountId = AccountMgr::GetId(accountName);
+        std::string error;
+        if (!RandomPlayerbotFactory::CreateObservationBot(accountId, characterName, static_cast<uint8>(race),
+                                                           static_cast<uint8>(cls), static_cast<uint8>(gender), error))
+        {
+            handler->PSendSysMessage("Observation bot creation failed: %s", error.c_str());
+            return false;
+        }
+
+        handler->PSendSysMessage("Observation bot created: %s on %s", characterName.c_str(), accountName.c_str());
+        return true;
     }
 
     static bool HandleGuildTaskCommand(ChatHandler* handler, char const* args)
