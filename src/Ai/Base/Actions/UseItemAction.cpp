@@ -467,12 +467,109 @@ bool UseRandomRecipe::isPossible() { return AI_VALUE2(uint32, "item count", "rec
 
 bool UseRandomQuestItem::Execute(Event /*event*/)
 {
-    Unit* unitTarget = nullptr;
-    ObjectGuid goTarget;
-
     std::vector<Item*> questItems = AI_VALUE2(std::vector<Item*>, "inventory items", "quest");
     if (questItems.empty())
         return false;
+
+    GuidVector unitCandidates = AI_VALUE(GuidVector, "possible new rpg targets");
+    GuidVector gameObjectCandidates = AI_VALUE(GuidVector, "nearest game objects no los");
+
+    for (auto const& [questId, status] : bot->getQuestStatusMap())
+    {
+        if (status.Status != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+
+        uint32 itemId = quest->GetSrcItemId();
+        Item* item = itemId ? bot->GetItemByEntry(itemId) : nullptr;
+        if (!item)
+            continue;
+
+        uint32 spellId = 0;
+        for (uint8 spellIndex = 0; spellIndex < MAX_ITEM_PROTO_SPELLS; ++spellIndex)
+        {
+            if (item->GetTemplate()->Spells[spellIndex].SpellId > 0)
+            {
+                spellId = item->GetTemplate()->Spells[spellIndex].SpellId;
+                break;
+            }
+        }
+        if (!spellId)
+            continue;
+
+        for (uint8 objectiveIndex = 0; objectiveIndex < QUEST_OBJECTIVES_COUNT; ++objectiveIndex)
+        {
+            int32 requiredEntry = quest->RequiredNpcOrGo[objectiveIndex];
+            uint32 requiredCount = quest->RequiredNpcOrGoCount[objectiveIndex];
+            if (!requiredEntry || !requiredCount || status.CreatureOrGOCount[objectiveIndex] >= requiredCount)
+                continue;
+
+            if (requiredEntry > 0)
+            {
+                Unit* nearest = nullptr;
+                for (ObjectGuid const& guid : unitCandidates)
+                {
+                    Unit* candidate = botAI->GetUnit(guid);
+                    if (!candidate || !candidate->IsInWorld() ||
+                        candidate->GetEntry() != static_cast<uint32>(requiredEntry))
+                        continue;
+
+                    if (!nearest || bot->GetDistance(candidate) < bot->GetDistance(nearest))
+                        nearest = candidate;
+                }
+
+                if (!nearest)
+                    continue;
+
+                if (bot->isMoving())
+                    bot->StopMoving();
+                bot->SetFacingToObject(nearest);
+                if (!botAI->CanCastSpell(spellId, nearest, false, nullptr, item))
+                    continue;
+                if (UseItemOnUnit(item, nearest))
+                {
+                    botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+                    LOG_INFO("playerbots", "{} used quest item {} on creature {} for quest {}", bot->GetName(),
+                             itemId, requiredEntry, questId);
+                    return true;
+                }
+            }
+            else
+            {
+                uint32 gameObjectEntry = static_cast<uint32>(-requiredEntry);
+                GameObject* nearest = nullptr;
+                for (ObjectGuid const& guid : gameObjectCandidates)
+                {
+                    GameObject* candidate = botAI->GetGameObject(guid);
+                    if (!candidate || !candidate->IsInWorld() || !candidate->isSpawned() ||
+                        candidate->GetEntry() != gameObjectEntry)
+                        continue;
+
+                    if (!nearest || bot->GetDistance(candidate) < bot->GetDistance(nearest))
+                        nearest = candidate;
+                }
+
+                if (!nearest)
+                    continue;
+
+                if (bot->isMoving())
+                    bot->StopMoving();
+                bot->SetFacingToObject(nearest);
+                if (!botAI->CanCastSpell(spellId, nearest, false))
+                    continue;
+                if (UseItemOnGameObject(item, nearest->GetGUID()))
+                {
+                    botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+                    LOG_INFO("playerbots", "{} used quest item {} on game object {} for quest {}", bot->GetName(),
+                             itemId, gameObjectEntry, questId);
+                    return true;
+                }
+            }
+        }
+    }
 
     Item* item = nullptr;
     for (uint8 i = 0; i < 5; i++)
@@ -496,7 +593,7 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
     if (!item)
         return false;
 
-    bool used = UseItem(item, goTarget, nullptr, unitTarget);
+    bool used = UseItem(item, ObjectGuid::Empty, nullptr);
     if (used)
         botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
 
@@ -505,7 +602,8 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
 
 bool UseRandomQuestItem::isUseful()
 {
-    return !IsRealPlayer(botAI->GetMaster()) && !bot->InBattleground() && !bot->HasUnitState(UNIT_STATE_IN_FLIGHT);
+    return !bot->IsInCombat() && !IsRealPlayer(botAI->GetMaster()) && !bot->InBattleground() &&
+           !bot->HasUnitState(UNIT_STATE_IN_FLIGHT);
 }
 
 bool UseRandomQuestItem::isPossible() { return AI_VALUE2(uint32, "item count", "quest") > 0; }

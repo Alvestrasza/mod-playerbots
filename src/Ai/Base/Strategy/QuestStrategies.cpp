@@ -15,6 +15,8 @@ void QuestStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 
     triggers.push_back(
         new TriggerNode("quest share", {  NextAction("accept quest share", relevance) }));
+    triggers.push_back(
+        new TriggerNode("often", { NextAction("use random quest item", relevance + 1.0f) }));
 }
 
 void DefaultQuestStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
