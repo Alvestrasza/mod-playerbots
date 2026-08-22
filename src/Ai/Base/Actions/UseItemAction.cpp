@@ -468,8 +468,6 @@ bool UseRandomRecipe::isPossible() { return AI_VALUE2(uint32, "item count", "rec
 bool UseRandomQuestItem::Execute(Event /*event*/)
 {
     std::vector<Item*> questItems = AI_VALUE2(std::vector<Item*>, "inventory items", "quest");
-    if (questItems.empty())
-        return false;
 
     GuidVector unitCandidates = AI_VALUE(GuidVector, "possible new rpg targets");
     GuidVector gameObjectCandidates = AI_VALUE(GuidVector, "nearest game objects no los");
@@ -571,6 +569,9 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
         }
     }
 
+    if (questItems.empty())
+        return false;
+
     Item* item = nullptr;
     for (uint8 i = 0; i < 5; i++)
     {
@@ -606,4 +607,17 @@ bool UseRandomQuestItem::isUseful()
            !bot->HasUnitState(UNIT_STATE_IN_FLIGHT);
 }
 
-bool UseRandomQuestItem::isPossible() { return AI_VALUE2(uint32, "item count", "quest") > 0; }
+bool UseRandomQuestItem::isPossible()
+{
+    for (auto const& [questId, status] : bot->getQuestStatusMap())
+    {
+        if (status.Status != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (quest && quest->GetSrcItemId() && bot->GetItemByEntry(quest->GetSrcItemId()))
+            return true;
+    }
+
+    return AI_VALUE2(uint32, "item count", "quest") > 0;
+}
