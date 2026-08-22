@@ -481,21 +481,18 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
         if (!quest)
             continue;
 
-        uint32 itemId = quest->GetSrcItemId();
-        Item* item = itemId ? bot->GetItemByEntry(itemId) : nullptr;
-        if (!item)
-            continue;
-
-        uint32 spellId = 0;
-        for (uint8 spellIndex = 0; spellIndex < MAX_ITEM_PROTO_SPELLS; ++spellIndex)
+        std::vector<Item*> candidates;
+        if (uint32 sourceItemId = quest->GetSrcItemId())
         {
-            if (item->GetTemplate()->Spells[spellIndex].SpellId > 0)
-            {
-                spellId = item->GetTemplate()->Spells[spellIndex].SpellId;
-                break;
-            }
+            if (Item* sourceItem = bot->GetItemByEntry(sourceItemId))
+                candidates.push_back(sourceItem);
         }
-        if (!spellId)
+        for (Item* questItem : questItems)
+        {
+            if (std::find(candidates.begin(), candidates.end(), questItem) == candidates.end())
+                candidates.push_back(questItem);
+        }
+        if (candidates.empty())
             continue;
 
         for (uint8 objectiveIndex = 0; objectiveIndex < QUEST_OBJECTIVES_COUNT; ++objectiveIndex)
@@ -522,17 +519,32 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                 if (!nearest)
                     continue;
 
-                if (bot->isMoving())
-                    bot->StopMoving();
-                bot->SetFacingToObject(nearest);
-                if (!botAI->CanCastSpell(spellId, nearest, false, nullptr, item))
-                    continue;
-                if (UseItemOnUnit(item, nearest))
+                for (Item* item : candidates)
                 {
-                    botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
-                    LOG_INFO("playerbots", "{} used quest item {} on creature {} for quest {}", bot->GetName(),
-                             itemId, requiredEntry, questId);
-                    return true;
+                    uint32 spellId = 0;
+                    for (uint8 spellIndex = 0; spellIndex < MAX_ITEM_PROTO_SPELLS; ++spellIndex)
+                    {
+                        uint32 candidateSpellId = item->GetTemplate()->Spells[spellIndex].SpellId;
+                        if (candidateSpellId > 0 &&
+                            botAI->CanCastSpell(candidateSpellId, nearest, false, nullptr, item))
+                        {
+                            spellId = candidateSpellId;
+                            break;
+                        }
+                    }
+                    if (!spellId)
+                        continue;
+
+                    if (bot->isMoving())
+                        bot->StopMoving();
+                    bot->SetFacingToObject(nearest);
+                    if (UseItemOnUnit(item, nearest))
+                    {
+                        botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+                        LOG_INFO("playerbots", "{} used quest item {} on creature {} for quest {}", bot->GetName(),
+                                 item->GetEntry(), requiredEntry, questId);
+                        return true;
+                    }
                 }
             }
             else
@@ -553,17 +565,31 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                 if (!nearest)
                     continue;
 
-                if (bot->isMoving())
-                    bot->StopMoving();
-                bot->SetFacingToObject(nearest);
-                if (!botAI->CanCastSpell(spellId, nearest, false))
-                    continue;
-                if (UseItemOnGameObject(item, nearest->GetGUID()))
+                for (Item* item : candidates)
                 {
-                    botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
-                    LOG_INFO("playerbots", "{} used quest item {} on game object {} for quest {}", bot->GetName(),
-                             itemId, gameObjectEntry, questId);
-                    return true;
+                    uint32 spellId = 0;
+                    for (uint8 spellIndex = 0; spellIndex < MAX_ITEM_PROTO_SPELLS; ++spellIndex)
+                    {
+                        uint32 candidateSpellId = item->GetTemplate()->Spells[spellIndex].SpellId;
+                        if (candidateSpellId > 0 && botAI->CanCastSpell(candidateSpellId, nearest, false))
+                        {
+                            spellId = candidateSpellId;
+                            break;
+                        }
+                    }
+                    if (!spellId)
+                        continue;
+
+                    if (bot->isMoving())
+                        bot->StopMoving();
+                    bot->SetFacingToObject(nearest);
+                    if (UseItemOnGameObject(item, nearest->GetGUID()))
+                    {
+                        botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
+                        LOG_INFO("playerbots", "{} used quest item {} on game object {} for quest {}", bot->GetName(),
+                                 item->GetEntry(), gameObjectEntry, questId);
+                        return true;
+                    }
                 }
             }
         }
@@ -609,6 +635,8 @@ bool UseRandomQuestItem::isUseful()
 
 bool UseRandomQuestItem::isPossible()
 {
+    std::vector<Item*> questItems = AI_VALUE2(std::vector<Item*>, "inventory items", "quest");
+
     for (auto const& [questId, status] : bot->getQuestStatusMap())
     {
         if (status.Status != QUEST_STATUS_INCOMPLETE)
@@ -617,7 +645,17 @@ bool UseRandomQuestItem::isPossible()
         Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
         if (quest && quest->GetSrcItemId() && bot->GetItemByEntry(quest->GetSrcItemId()))
             return true;
+
+        if (!quest || questItems.empty())
+            continue;
+
+        for (uint8 objectiveIndex = 0; objectiveIndex < QUEST_OBJECTIVES_COUNT; ++objectiveIndex)
+        {
+            if (quest->RequiredNpcOrGo[objectiveIndex] && quest->RequiredNpcOrGoCount[objectiveIndex] &&
+                status.CreatureOrGOCount[objectiveIndex] < quest->RequiredNpcOrGoCount[objectiveIndex])
+                return true;
+        }
     }
 
-    return AI_VALUE2(uint32, "item count", "quest") > 0;
+    return !questItems.empty();
 }
