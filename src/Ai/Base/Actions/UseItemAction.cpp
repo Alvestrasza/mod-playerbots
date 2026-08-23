@@ -552,20 +552,41 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
             else
             {
                 uint32 gameObjectEntry = static_cast<uint32>(-requiredEntry);
-                GameObject* nearest = nullptr;
-                for (ObjectGuid const& guid : gameObjectCandidates)
+                uint32 progress = status.CreatureOrGOCount[objectiveIndex];
+                uint64 stateKey = (static_cast<uint64>(questId) << 8) | objectiveIndex;
+                QuestGameObjectUseState& useState = questGameObjectUseStates[stateKey];
+                if (progress < useState.progress)
+                    useState.attemptedTargets.clear();
+                useState.progress = progress;
+
+                auto findNearestUnused = [&]() -> GameObject*
                 {
-                    GameObject* candidate = botAI->GetGameObject(guid);
-                    if (!candidate || !candidate->IsInWorld() || !candidate->isSpawned() ||
-                        candidate->GetEntry() != gameObjectEntry)
-                        continue;
+                    GameObject* nearest = nullptr;
+                    for (ObjectGuid const& guid : gameObjectCandidates)
+                    {
+                        GameObject* candidate = botAI->GetGameObject(guid);
+                        if (!candidate || !candidate->IsInWorld() || !candidate->isSpawned() ||
+                            candidate->GetEntry() != gameObjectEntry ||
+                            useState.attemptedTargets.find(candidate->GetGUID().GetRawValue()) !=
+                                useState.attemptedTargets.end())
+                            continue;
 
-                    if (!nearest || bot->GetDistance(candidate) < bot->GetDistance(nearest))
-                        nearest = candidate;
-                }
+                        if (!nearest || bot->GetDistance(candidate) < bot->GetDistance(nearest))
+                            nearest = candidate;
+                    }
+                    return nearest;
+                };
 
+                GameObject* nearest = findNearestUnused();
                 if (!nearest)
-                    continue;
+                {
+                    // Some objectives legitimately need more uses than there are simultaneously visible objects.
+                    // Once every visible target has been attempted, allow a new pass for later respawns.
+                    useState.attemptedTargets.clear();
+                    nearest = findNearestUnused();
+                    if (!nearest)
+                        continue;
+                }
 
                 for (Item* item : candidates)
                 {
@@ -587,6 +608,7 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                     bot->SetFacingToObject(nearest);
                     if (UseItemOnGameObject(item, nearest->GetGUID()))
                     {
+                        useState.attemptedTargets.insert(nearest->GetGUID().GetRawValue());
                         botAI->SetNextCheckDelay(sPlayerbotAIConfig.globalCoolDown);
                         LOG_INFO("playerbots", "{} used quest item {} on game object {} for quest {}", bot->GetName(),
                                  item->GetEntry(), gameObjectEntry, questId);

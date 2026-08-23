@@ -8,6 +8,9 @@
 #define PLAYERBOTS_USEITEMACTION_H
 
 #include "Action.h"
+#include <cstdint>
+#include <unordered_map>
+#include <unordered_set>
 
 class Item;
 class ObjectGuid;
@@ -94,6 +97,15 @@ public:
     bool Execute(Event event) override;
     bool isUseful() override;
     bool isPossible() override;
+
+private:
+    struct QuestGameObjectUseState
+    {
+        std::uint32_t progress = 0;
+        std::unordered_set<std::uint64_t> attemptedTargets;
+    };
+
+    std::unordered_map<std::uint64_t, QuestGameObjectUseState> questGameObjectUseStates;
 };
 
 #endif
