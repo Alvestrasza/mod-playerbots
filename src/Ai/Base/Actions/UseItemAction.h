@@ -7,7 +7,7 @@
 #ifndef PLAYERBOTS_USEITEMACTION_H
 #define PLAYERBOTS_USEITEMACTION_H
 
-#include "Action.h"
+#include "MovementActions.h"
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
@@ -17,11 +17,11 @@ class ObjectGuid;
 class PlayerbotAI;
 class Unit;
 
-class UseItemAction : public Action
+class UseItemAction : public MovementAction
 {
 public:
     UseItemAction(PlayerbotAI* botAI, std::string const name = "use", bool selfOnly = false)
-        : Action(botAI, name), selfOnly(selfOnly)
+        : MovementAction(botAI, name), selfOnly(selfOnly)
     {
     }
 

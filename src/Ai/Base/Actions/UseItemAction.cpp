@@ -521,6 +521,10 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                 if (!nearest)
                     continue;
 
+                if (bot->GetDistance(nearest) > sPlayerbotAIConfig.contactDistance)
+                    return MoveNear(nearest, sPlayerbotAIConfig.contactDistance,
+                                    MovementPriority::MOVEMENT_FORCED);
+
                 for (Item* item : candidates)
                 {
                     uint32 spellId = 0;
@@ -548,6 +552,8 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                         return true;
                     }
                 }
+
+                return false;
             }
             else
             {
@@ -588,6 +594,10 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                         continue;
                 }
 
+                if (bot->GetDistance(nearest) > sPlayerbotAIConfig.contactDistance)
+                    return MoveNear(nearest, sPlayerbotAIConfig.contactDistance,
+                                    MovementPriority::MOVEMENT_FORCED);
+
                 for (Item* item : candidates)
                 {
                     uint32 spellId = 0;
@@ -615,6 +625,8 @@ bool UseRandomQuestItem::Execute(Event /*event*/)
                         return true;
                     }
                 }
+
+                return false;
             }
         }
     }
